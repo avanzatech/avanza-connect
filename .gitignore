@@ -1,0 +1,11 @@
+﻿# ignore everything
+*
+# except the real card files
+!index.html
+!manifest.webmanifest
+!sw.js
+!icon-192.png
+!icon-512.png
+!ali-avatar.jpg
+!vcard-photo.b64
+!.gitignore
