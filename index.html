@@ -35,6 +35,19 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { background: var(--void); color: var(--white); font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; }
+  /* rich animated dark gradient base — premium, not flat */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1;
+    background:
+      linear-gradient(165deg, #0b0a0f 0%, #08070b 40%, #0a0810 100%),
+      radial-gradient(120% 80% at 50% 0%, rgba(233,205,147,0.05), transparent 55%);
+    background-size: 100% 100%, 200% 200%;
+    animation: bgShift 30s ease-in-out infinite;
+  }
+  @keyframes bgShift {
+    0%,100% { background-position: 0% 0%, 50% 0%; }
+    50% { background-position: 0% 0%, 50% 30%; }
+  }
   body {
     min-height: 100vh; min-height: 100dvh;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -227,7 +240,8 @@
   @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes pop { from { opacity: 0; transform: scale(0.84); } to { opacity: 1; transform: scale(1); } }
 
-  /* fail-safe visibility */
+  /* fail-safe visibility — shell AND all children stay visible even if animations never fire */
+  .shell { opacity: 1 !important; }
   .logo, .lang, .avatar, .name, .title, .status, .cta, .hint, .action, .footer { opacity: 1; }
 
   @media (max-width: 380px) {
@@ -311,7 +325,7 @@
       save: "Guardar contacto",
       hint: "Se añade a tu móvil con un toque",
       call: "Llamar", email: "Email", web: "Web",
-      installT: "Guarda esta tarjeta", installS: "Añádela a tu pantalla de inicio",
+      installT: "Guarda esta tarjeta", installS: "Añádela a tu pantalla de inicio", iosT: "Añadir en iPhone", iosS: "Pulsa Compartir → Añadir a inicio",
       footer: "Conectado con un toque",
       opening: "✓ Abriendo en tus contactos…"
     },
@@ -321,7 +335,7 @@
       save: "Save contact",
       hint: "Adds to your phone in one tap",
       call: "Call", email: "Email", web: "Website",
-      installT: "Keep this card", installS: "Add it to your home screen",
+      installT: "Keep this card", installS: "Add it to your home screen", iosT: "Add on iPhone", iosS: "Tap Share → Add to Home Screen",
       footer: "Tapped to connect",
       opening: "✓ Opening in your contacts…"
     }
@@ -410,21 +424,37 @@
 
   // PWA install
   var deferredPrompt = null;
+  var installEl = document.getElementById("install");
+  var isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  // Android/Chrome: capture the native prompt and show the one-tap banner
   window.addEventListener("beforeinstallprompt", function (e) {
     e.preventDefault(); deferredPrompt = e;
-    document.getElementById("install").classList.add("show");
+    if (!isStandalone) installEl.classList.add("show");
   });
   document.getElementById("install-btn").addEventListener("click", function () {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function () {
-      deferredPrompt = null;
-      document.getElementById("install").classList.remove("show");
-    });
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function () {
+        deferredPrompt = null;
+        installEl.classList.remove("show");
+      });
+    } else if (isIOS) {
+      // iOS Safari can't auto-prompt — show the manual instruction
+      var meta = installEl.querySelector(".meta");
+      meta.querySelector("b").textContent = I18N[lang].iosT || "Añadir en iPhone";
+      meta.querySelector("span").textContent = I18N[lang].iosS || "Pulsa Compartir → Añadir a inicio";
+    }
   });
-  if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
-    var el = document.getElementById("install"); if (el) el.classList.remove("show");
+
+  // iOS: show the card with a manual hint (Safari never fires beforeinstallprompt)
+  if (isIOS && !isStandalone) {
+    installEl.querySelector(".meta b").textContent = I18N[lang].installT;
+    installEl.querySelector(".meta span").textContent = I18N[lang].iosS || "Pulsa Compartir → Añadir a inicio";
+    installEl.classList.add("show");
   }
+  if (isStandalone) { installEl.classList.remove("show"); }
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("./sw.js").catch(function () {}); });
